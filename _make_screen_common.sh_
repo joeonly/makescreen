@@ -1,0 +1,83 @@
+function create_screen() {
+    local count=$(ps -ef | grep -E "SCREEN.*${ssn}"|grep -v grep|wc -l)
+    #echo $count
+    if [ $count -eq 1 ]; then
+        screen -ls
+        echo "There is already a screen named xxx.${ssn}."
+        if [ "$1"xx = "-keep"xx ]; then
+            return
+        fi
+
+        echo "You can keep it with option -keep."
+        echo "But we will kill it because there is not -keep option this time."
+        screen -r ${ssn} -X quit
+    elif [ $count -gt 1 ]; then
+        echo "More than one screen named xxx.${ssn} already exist!"
+        echo "Please kill or quit the existing one(s) manually."
+        return
+    fi
+
+    screen -dmS ${ssn} -t bash
+    sleep 1
+    #the follow commands works in Screen version 4.00.03 (FAU) 23-Oct-06
+    #and in newer version, 'screen -t' will be regarded as other commands after stuff and \n work well to avoid multi lines quote string
+    #eg. screen -r ${ssn} -p bash -X stuff "screen -t uas\n"
+
+    i=0
+    n=${#titles[*]}
+    while [ $i -lt $n ]; do
+        title=${titles[$i]}
+        if [ ! "$title"xx == ""xx ]; then
+            screen -r ${ssn} -p bash -X screen -t $title
+        fi
+
+        dir=${dirs[$i]}
+        if [ ! "$dir"xx == ""xx ]; then
+            screen -r ${ssn} -p ${titles[$i]} -X stuff "cd $dir
+            "
+        fi
+
+        cmd=${cmds[$i]}
+        m=${#cmd}
+        if [ ! "$cmd"xx == ""xx ]; then
+            #decode \n
+            m=$(($m-2))
+            if [ $m -gt 0 ]; then
+                if [ "${cmd:$m:2}"xx == "\n"xx ]; then
+                    cmd="${cmd:0:$m}
+                    "
+                fi
+            fi
+        fi
+        #use a simple but safe way to trim(but it seems that the prefix of 13 spaces we see in the command and we want to delete is not the ones we are deleting)
+        while [ "${cmd:0:1}"xx == " "xx ]; do
+            cmd=${cmd:1:$m}
+        done
+
+        if [ ! "$cmd"xx == ""xx ]; then
+            screen -r ${ssn} -p ${titles[$i]} -X stuff "$cmd"
+        fi
+
+        i=$(($i + 1))
+    done
+
+    screen -ls
+	echo "Pease use screen -r xxx to enter a screen."
+    echo created
+}
+
+function show_usage() {
+    echo "Usage $0 <screen session name>\n"
+    echo "eg. $0 jack"
+}
+
+function main() {
+    if [ "$1"xx = "xx" ]; then
+        show_usage
+        exit 1
+    fi
+    local ssn="$1"
+
+    init_data "$@"
+    create_screen "$@"
+}
